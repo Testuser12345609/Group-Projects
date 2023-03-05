@@ -276,6 +276,14 @@ Hint2 :`plm` works similarly to `lm` but 1) you need to let R know what is the i
 
 ```{r}
 #your turn
+#Running the pooled regression model
+#added the interaction term between education & year 
+fit_pooled1 <- plm(lwage ~ year*educ + black + union + educ + year + south + exper + married + hisp + poorhlth, data = wagepan,index = c("nr", "year"), model = "pooling")
+stargazer(fit_pooled1, type = "text")
+
+#Running the Fixed Effects Model
+panel_fe <- plm(lwage ~ educ + year + educ:year + south + married + exper + union + black + hisp + poorhlth, data = wagepan,index = c("nr", "year"), model = "within")
+summary(panel_fe)
 
 ```
 Please interpret the pooled fixed and random effect models with respect to the effect of education and how this changed over the years. Please test some of the basic assumptions of a linear (random effects)  regression including normality of residuals (and normality of random effects if possible), heteroskedasticity etc
