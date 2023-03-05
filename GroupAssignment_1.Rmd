@@ -1,0 +1,291 @@
+---
+title: 'Regression modeling using Panel Data '
+author: "Pratyasha, Chantal, Jessica"
+output:
+html_document:
+    df_print: paged
+  word_document: default
+subtitle: Using panel data in Regression Modelling
+---
+This worksheet provides a series of assignments on the use of R to develop linear regression models with repeated cross section and panel data .
+
+
+Throughout the assignment, we will demonstrate code and leave some empty *code chunks* for you to fill in. We will also provide solutions after the end of the course.
+
+Feel free to modify this document with your own comments and clarifications. 
+
+
+# Assignment
+
+You are asked to complete a series of regression models that will uncover the effect of education on (log)  returns . We will use a dataset that comes with the book "Introductory Econometrics: A Modern Approach" by JM Wooldridge. The data come from two waves of the Current Population Survey (1978-1985). Below we load the data and store them in a variable named `wages`
+
+
+```{r}
+#install package "wooldridge" and the Panel Linear Model (plm) package
+library(wooldridge)
+library(plm)
+library(lme4)
+library(table1)
+library(dplyr)
+library(tidyverse)
+library(dplyr)
+library(ggplot2)
+library(stargazer)
+library(plm)
+library(vtable)
+data('cps78_85')
+wages <- cps78_85
+
+```
+
+
+First examine the data and how they behave. Use histograms, the `summary` function and other plots and tabular forms of your choice to summarize the data. Note any limitations you observe. Repeat the process for both waves   separately. 
+Hint: remember to use the plot functionality discussed in class
+
+Similarly can you create scatterplots to illustrate the relation between (log) wages and 1) education 2) gender and 3)work experience?
+
+
+
+
+
+```{r}
+# your turn
+
+hist(wages$lwage, main = "Histogram of Wages", xlab = "Wages($)")
+summary(wages$lwage)
+
+hist(wages$educ, main = "Histogram of Education", xlab = "Education (years)")
+summary(wages$educ)
+
+hist(wages$female, main = "Histogram of Female Gender", xlab = "Female Identifying = 1")
+#Where 1 = identifies as female, 0= doesnt identify as female
+summary(wages$female)
+
+hist(wages$exper, main = "Histogram of Work Experience", xlab = "Work Experience (years)")
+summary(wages$exper)
+
+
+#Can also look at vsummary table with these variables included
+vtable::sumtable(wages)
+st(wages, vars = c(Wages = 'lwage','educ','female', 'exper'))
+#Limitations we can observe here are ___________.
+
+
+#Now we do this for the separate waves
+#Wave 1978
+wages1978 <- subset(wages,year == 78) 
+
+hist(wages1978$lwage, main = "Histogram of Wages 1978", xlab = "Wages($)")
+summary(wages$lwage)
+
+hist(wages1978$educ, main = "Histogram of Education 1978", xlab = "Education (years)")
+summary(wages1978$educ)
+
+hist(wages1978$female, main = "Histogram of Female Gender 1978", xlab = "Female Identifying = 1")
+#Where 1 = identifies as female, 0 = doesnt identify as female
+summary(wages1978$female)
+
+hist(wages1978$exper, main = "Histogram of Work Experience 1978", xlab = "Work Experience (years)")
+summary(wages1978$exper)
+
+#Wave 1985
+wages1985 <- subset(wages, year == 85)
+
+hist(wages1985$lwage, main = "Histogram of Wages 1985", xlab = "Wages($)")
+summary(wages1985$lwage)
+
+hist(wages1985$educ, main = "Histogram of Education 1985", xlab = "Education (years)")
+summary(wages1985$educ)
+
+hist(wages1985$female, main = "Histogram of Female Gender 1985", xlab = "Female Identifying = 1")
+#Where 1 = identifies as female, 0 = doesnt identify as female
+summary(wages1985$female)
+
+hist(wages1985$exper, main = "Histogram of Work Experience 1985", xlab = "Work Experience (years)")
+summary(wages1985$exper)
+
+#Next we'll look at scatterplots to illustrate the relation between (log) wages and 1) education 
+
+ggplot2::ggplot()
+  wages %>% ggplot (aes(x= educ, y = log(lwage))) + geom_point() 
+
+ggplot2::ggplot()
+  wages1978 %>% ggplot (aes(x= educ, y = log(lwage))) + geom_point() 
+
+ggplot2::ggplot()
+  wages1985 %>% ggplot (aes(x= educ, y = log(lwage))) + geom_point() 
+
+#2) gender 
+ggplot2::ggplot()
+  wages %>% ggplot (aes(x= female, y = log(lwage))) + geom_point() 
+
+ggplot2::ggplot()
+  wages1978 %>% ggplot (aes(x= female, y = log(lwage))) + geom_point() 
+
+ggplot2::ggplot()
+  wages1985 %>% ggplot (aes(x= female, y = log(lwage))) + geom_point() 
+
+#3)work experience?
+ggplot2::ggplot()
+  wages %>% ggplot (aes(x= exper, y = log(lwage))) + geom_point()
+
+ggplot2::ggplot()
+  wages1978 %>% ggplot (aes(x= exper, y = log(lwage))) + geom_point()
+
+ggplot2::ggplot()
+  wages1985 %>% ggplot (aes(x= exper, y = log(lwage))) + geom_point()
+
+```
+
+You can use `table1` to make pretty descriptive tables for all the variables in the `wages`  dataset
+
+```{r}
+
+# illustration of how table1 works
+table1(~ lwage  | y85, data=wages)
+
+# your turn: make a comprehensive table1 with all the variables of the `wages` dataset. Change the names in the headers from "0" and "1" to something more informative
+
+```
+
+
+You are asked to fit a linear regression model to measure the effect of education on the log earnings while adjusting for experience and gender. In partcular, you are asked to fit :
+1. a pooled model that ignores the wave effect (1978 vs 1985)
+2. separate models for each wave
+
+What do you notice on the effect of education? Can you fit a model that quatifies the change on the education effect? similarly can you estimate (in the same model) the change in the gender wage gap?
+try interpreting the results of each model
+
+Hint 1: consider using interaction variables
+Hint 2: datasets in R have a helpful help file (`?cps78_85`)
+
+```{r}
+#Creating a new variable, sex with female and male 
+wages <-wages %>%
+  mutate(sex = ifelse(female == 0, "male", "female"))
+```
+
+
+```{r}
+# your turn
+
+#Creating Table1 for the "wage" part
+wages1 <- wages
+wages1$year <- 
+  factor(wages1$year, 
+         levels=c(78,85),
+         labels=c("Year 1978", 
+                  "Year 1985"))
+
+wages1$married <- 
+  factor(wages1$married, 
+         levels=c(0,1),
+         labels=c("Unmarried", 
+                  "Married"))
+
+wages1$south <- 
+  factor(wages1$south, 
+         levels=c(0,1),
+         labels=c("Not South", 
+                  "South"))
+
+wages1$union <- 
+  factor(wages1$union, 
+         levels=c(0,1),
+         labels=c("Not in Union", 
+                  "In Union"))
+
+wages1$nonwhite <- 
+  factor(wages1$nonwhite, 
+         levels=c(0,1),
+         labels=c("White", 
+                  "Non-White"))
+
+
+label(wages1$lwage)  <- "log wage"
+label(wages1$exper)  <- "experience"
+label(wages1$educ)   <- "education"
+label(wages1$union)   <- "union"
+label(wages1$nonwhite)   <- "White"
+
+table1(~ lwage  + educ + exper + as.factor(sex) + as.factor(married) + as.factor(south) + as.factor(union) + as.factor(nonwhite) | year, data=wages1)
+
+
+```
+
+You have estimated above that indeed education has a positive effect on earnings and that the same years of education would yield higher earnings in 1985 compared to 1978. Next, we would like to estimate how education has affected this change in earnings longitudinally. 
+
+We load a dataset that comes from the National Longitudinal Survey
+and comprise a sample of full-time working males who have completed their
+schooling by 1980 and then followed over the period 1980 to 1987 (8 times).
+
+
+```{r}
+
+#Running the pooled regression model 
+fit_pooled <- plm(lwage ~ educ + female + exper, data = wages,index = c("year"), model = "pooling")
+stargazer(fit_pooled, type = "text")
+```
+
+```{r}
+# Running a separate regression for the year 1978
+wages85 <- subset(wages,year == 78) #creating the data subset for the year 1978
+fit_lm78 <- lm(lwage ~ educ + female + exper, data = wages78)
+stargazer(fit_lm78, type = "text")
+```
+
+
+```{r}
+# running the regression for the year 1985
+wages85 <- subset(wages,year == 85) #creating the data subset for the year 1985
+fit_lm85 <- lm(lwage ~ educ + female + exper, data = wages85)
+stargazer(fit_lm85, type = "text")
+```
+
+```{r}
+#Running the model by including the interaction variable between education & gender 
+educ_model <- lm(lwage ~  educ*female + year + exper, data = wages)
+stargazer(educ_model, type = "text")
+```
+
+
+
+```{r}
+#load the data. by default the function below creates a dataset `wagepan`
+data(wagepan)
+
+
+
+```
+
+Similar to above, you are asked to observe the data well, through data summaries, histograms and  scatterplots of your choice. All these can help you understand the relation between the covariates. Particular focus should be given in the relation between log wages and time as well as education and log wages . Create a table 1 using the `tableone` or `table1` R packages 
+
+```{r}
+# your turn - summarize the data 
+
+```
+
+You are asked to understand  the interaction of time with  education on earnings. How did the effect of education on earnings change over time? There are other covariates that are likely to also affect earnings (e.g. race, marriage, belonging to a union) that you would need to adjust for.
+
+One possible place you could start is by calculating an  effect that ignores any correlation (or a pooled effect) and fixed effect models. Alternatively you can fit a  random effect model where a random intercept is introduced on the individual level. 
+
+Hint1: you can do the same thing in many ways in R. Remember to  use `plm` over `lme4` for more "standard" econometric random effect models where no assumption on the distribution is made.
+
+Hint2 :`plm` works similarly to `lm` but 1) you need to let R know what is the index variable and 2) what kind of model you will be estimating
+
+
+```{r}
+#your turn
+
+```
+Please interpret the pooled fixed and random effect models with respect to the effect of education and how this changed over the years. Please test some of the basic assumptions of a linear (random effects)  regression including normality of residuals (and normality of random effects if possible), heteroskedasticity etc
+
+```{r}
+#yourturn
+```
+
+Does  model performance improve when you assume year to be a continuous variable as opposed to a categorical? Please explain, interprete the effect of year in both cases and provide the code to estimate the effect of year as a continuous variable. 
+
+ 
+
+
